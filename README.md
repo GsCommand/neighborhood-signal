@@ -10,12 +10,32 @@ The MVP detects service-buying intent from neighborhood conversations, scores ea
 - 0–100 intent score and urgency classification
 - Recommendation-request detection
 - Service + neighborhood classification
+- Live lead feed backed by Supabase when server credentials are configured
 - Past-customer matching concept
 - Territory and keyword configuration views
 - Connector-neutral `POST /api/ingest` endpoint
-- Nextdoor/Facebook connector placeholders without brittle scraping
-- Supabase-ready production schema with RLS enabled
-- Seeded Jacksonville / Nocatee / Ponte Vedra / Yulee demo data
+- Protected production ingestion with `INGEST_API_KEY`
+- Database health endpoint at `GET /api/health`
+- Nextdoor/Facebook connector boundaries without brittle scraping
+- Production Supabase schema with RLS, indexes, default-deny browser access, and audit events
+- Seeded Jacksonville / Nocatee / Ponte Vedra / Yulee configuration data
+
+## Production database
+
+Supabase project: `eynkqsxxwudsbskewahj` (`us-east-1`).
+
+The repository schema is in `supabase/schema.sql`. Browser roles currently have no direct access to the business tables. Server-side calls use `SUPABASE_SECRET_KEY` and the `service_role` database role. Authenticated tenant policies will be added when the multi-user dashboard is introduced.
+
+Required production variables:
+
+```bash
+SUPABASE_URL=https://eynkqsxxwudsbskewahj.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+INGEST_API_KEY=<strong-random-secret>
+NEIGHBORHOOD_SIGNAL_ORG_NAME=HydroSeal Demo
+```
+
+Never expose `SUPABASE_SECRET_KEY` in a `NEXT_PUBLIC_` variable or commit it to Git.
 
 ## Run locally
 
@@ -26,11 +46,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+Without a Supabase secret key the UI falls back to seeded demo leads. On Vercel, ingestion is intentionally disabled until both the database secret and `INGEST_API_KEY` are configured.
+
 ## Ingestion contract
 
 ```bash
 curl -X POST http://localhost:3000/api/ingest \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <INGEST_API_KEY>' \
   -d '{
     "source": "nextdoor",
     "externalId": "post_123",
@@ -40,11 +63,15 @@ curl -X POST http://localhost:3000/api/ingest \
   }'
 ```
 
-If `INGEST_API_KEY` is configured, include `Authorization: Bearer <key>`.
+A successful production request classifies the conversation, persists the lead, writes an audit event, and returns the stored record.
 
-## Persistence
+## Health check
 
-The first pass uses an in-memory lead store so the app can run with zero credentials. `supabase/schema.sql` contains the production data model. The next infrastructure step is to select/create a Supabase project, apply the schema, add tenant auth/RLS policies, and replace the in-memory repository with Supabase.
+```bash
+curl http://localhost:3000/api/health
+```
+
+The response reports only whether persistence is configured and reachable. It never returns keys or connection strings.
 
 ## Trust rule
 
