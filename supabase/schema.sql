@@ -1,5 +1,7 @@
--- Neighborhood Signal production schema draft.
--- Apply after a Supabase project is selected. Tables are tenant-ready from day one.
+-- Neighborhood Signal production schema.
+-- Current hosted project: eynkqsxxwudsbskewahj (us-east-1).
+-- Public tables are intentionally not granted to anon/authenticated yet.
+
 create extension if not exists pgcrypto;
 
 create table if not exists public.organizations (
@@ -84,6 +86,16 @@ create table if not exists public.audit_events (
   created_at timestamptz not null default now()
 );
 
+create index if not exists leads_org_created_idx on public.leads (organization_id, created_at desc);
+create index if not exists leads_org_status_score_idx on public.leads (organization_id, status, score desc);
+create index if not exists leads_org_neighborhood_idx on public.leads (organization_id, neighborhood);
+create index if not exists customers_org_neighborhood_idx on public.customers (organization_id, neighborhood);
+create index if not exists customers_org_recommendable_idx on public.customers (organization_id, recommendable) where recommendable = true;
+create index if not exists territories_org_active_idx on public.territories (organization_id, active);
+create index if not exists keywords_org_active_idx on public.keywords (organization_id, active);
+create index if not exists outreach_org_lead_idx on public.outreach (organization_id, lead_id);
+create index if not exists audit_events_org_created_idx on public.audit_events (organization_id, created_at desc);
+
 alter table public.organizations enable row level security;
 alter table public.territories enable row level security;
 alter table public.customers enable row level security;
@@ -92,5 +104,26 @@ alter table public.keywords enable row level security;
 alter table public.outreach enable row level security;
 alter table public.audit_events enable row level security;
 
--- No broad anon/authenticated policies are intentionally created here.
--- Production auth/organization membership policies should be applied once the auth model is connected.
+-- Default-deny browser access. The backend uses SUPABASE_SECRET_KEY, which maps
+-- to service_role and bypasses RLS. Authenticated tenant policies will be added
+-- when the multi-user dashboard is introduced.
+revoke all on table public.organizations from anon, authenticated;
+revoke all on table public.territories from anon, authenticated;
+revoke all on table public.customers from anon, authenticated;
+revoke all on table public.leads from anon, authenticated;
+revoke all on table public.keywords from anon, authenticated;
+revoke all on table public.outreach from anon, authenticated;
+revoke all on table public.audit_events from anon, authenticated;
+
+grant select, insert, update, delete on table public.organizations to service_role;
+grant select, insert, update, delete on table public.territories to service_role;
+grant select, insert, update, delete on table public.customers to service_role;
+grant select, insert, update, delete on table public.leads to service_role;
+grant select, insert, update, delete on table public.keywords to service_role;
+grant select, insert, update, delete on table public.outreach to service_role;
+grant select, insert, update, delete on table public.audit_events to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
+-- Supabase's automatic-RLS helper is an internal event-trigger helper and should
+-- not be callable through the public API.
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
