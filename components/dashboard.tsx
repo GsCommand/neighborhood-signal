@@ -1,25 +1,57 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { customers, keywords, leads, territories } from "@/lib/demo-data";
+import { useEffect, useMemo, useState } from "react";
+import { customers, keywords, leads as demoLeads, territories } from "@/lib/demo-data";
 import type { Lead } from "@/lib/types";
 
 const tabs = ["Overview", "Lead Feed", "Customers", "Territories", "Keywords", "Integrations"] as const;
 type Tab = (typeof tabs)[number];
+type PersistenceMode = "loading" | "supabase" | "memory";
 
 export function Dashboard() {
   const [tab, setTab] = useState<Tab>("Overview");
-  const [selectedLead, setSelectedLead] = useState<Lead>(leads[0]);
+  const [leadItems, setLeadItems] = useState<Lead[]>(demoLeads);
+  const [selectedLead, setSelectedLead] = useState<Lead>(demoLeads[0]);
   const [query, setQuery] = useState("");
+  const [persistence, setPersistence] = useState<PersistenceMode>("loading");
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshLeads() {
+      try {
+        const response = await fetch("/api/leads", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json() as { leads?: Lead[]; persistence?: "supabase" | "memory" };
+        if (!active) return;
+
+        if (Array.isArray(payload.leads) && payload.leads.length) {
+          setLeadItems(payload.leads);
+          setSelectedLead((current) => payload.leads?.find((lead) => lead.id === current.id) || payload.leads?.[0] || current);
+        }
+        setPersistence(payload.persistence === "supabase" ? "supabase" : "memory");
+      } catch {
+        if (active) setPersistence("memory");
+      }
+    }
+
+    void refreshLeads();
+    const timer = window.setInterval(refreshLeads, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const filteredLeads = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return leads;
-    return leads.filter((lead) => [lead.text, lead.neighborhood, lead.city, lead.service, lead.source].join(" ").toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return leadItems;
+    return leadItems.filter((lead) => [lead.text, lead.neighborhood, lead.city, lead.service, lead.source].join(" ").toLowerCase().includes(q));
+  }, [leadItems, query]);
 
-  const highIntent = leads.filter((lead) => lead.score >= 90).length;
-  const recommendationRequests = leads.filter((lead) => lead.recommendationIntent).length;
+  const highIntent = leadItems.filter((lead) => lead.score >= 90).length;
+  const recommendationRequests = leadItems.filter((lead) => lead.recommendationIntent).length;
+  const persistenceLabel = persistence === "supabase" ? "Supabase connected" : persistence === "loading" ? "Checking persistence" : "Demo persistence";
 
   return (
     <div className="app-shell">
@@ -37,8 +69,8 @@ export function Dashboard() {
         </nav>
         <div className="sidebar-card">
           <div className="pulse-row"><span className="pulse" /> Monitoring active</div>
-          <strong>6 territories</strong>
-          <p>Manual + webhook ingestion are ready. External connectors can attach to the same pipeline.</p>
+          <strong>{persistenceLabel}</strong>
+          <p>Manual + webhook ingestion share one scoring pipeline. Approved external connectors can attach without changing the lead model.</p>
         </div>
         <div className="workspace"><span>HS</span><div><strong>HydroSeal Demo</strong><small>Jacksonville market</small></div></div>
       </aside>
@@ -49,37 +81,39 @@ export function Dashboard() {
             <p className="eyebrow">Neighborhood intelligence</p>
             <h1>{tab}</h1>
           </div>
-          <div className="top-actions"><button className="ghost-button">Last 24 hours</button><button className="primary-button" onClick={() => setTab("Lead Feed")}>View live leads</button></div>
+          <div className="top-actions"><button className="ghost-button">Auto-refresh · 30s</button><button className="primary-button" onClick={() => setTab("Lead Feed")}>View live leads</button></div>
         </header>
 
-        {tab === "Overview" && <Overview onLeadClick={(lead) => { setSelectedLead(lead); setTab("Lead Feed"); }} highIntent={highIntent} recommendationRequests={recommendationRequests} />}
+        {tab === "Overview" && <Overview leads={leadItems} onLeadClick={(lead) => { setSelectedLead(lead); setTab("Lead Feed"); }} highIntent={highIntent} recommendationRequests={recommendationRequests} />}
         {tab === "Lead Feed" && <LeadFeed leads={filteredLeads} selected={selectedLead} setSelected={setSelectedLead} query={query} setQuery={setQuery} />}
         {tab === "Customers" && <Customers />}
         {tab === "Territories" && <Territories />}
         {tab === "Keywords" && <Keywords />}
-        {tab === "Integrations" && <Integrations />}
+        {tab === "Integrations" && <Integrations persistence={persistence} />}
       </main>
     </div>
   );
 }
 
-function Overview({ onLeadClick, highIntent, recommendationRequests }: { onLeadClick: (lead: Lead) => void; highIntent: number; recommendationRequests: number }) {
+function Overview({ leads, onLeadClick, highIntent, recommendationRequests }: { leads: Lead[]; onLeadClick: (lead: Lead) => void; highIntent: number; recommendationRequests: number }) {
+  const hottest = leads.reduce((max, lead) => Math.max(max, lead.score), 0);
+  const matchedCustomers = customers.filter((customer) => customer.recommendable).length;
   const stats = [
-    ["Relevant conversations", "64", "+18%", "Detected across active sources"],
-    ["High-intent leads", String(highIntent), "+2 today", "90+ intent score"],
-    ["Recommendation asks", String(recommendationRequests), "60%", "Explicit vendor recommendation"],
-    ["Matched customers", "4", "3 neighborhoods", "Past customers near active leads"],
+    ["Relevant conversations", String(leads.length), "Live feed", "Detected across active sources"],
+    ["High-intent leads", String(highIntent), "90+", "Highest-priority buying signals"],
+    ["Recommendation asks", String(recommendationRequests), "Explicit", "Vendor recommendation intent"],
+    ["Matched customers", String(matchedCustomers), "Eligible", "Past customers available for genuine outreach"],
   ];
   return <>
     <section className="hero-card">
       <div><span className="status-pill">● Live market</span><h2>Know when a homeowner is asking for your service.</h2><p>Neighborhood Signal separates real buying intent from neighborhood chatter, then shows the best response path — including legitimate past customers nearby.</p></div>
-      <div className="hero-score"><small>Hottest lead</small><strong>97</strong><span>/100 intent</span></div>
+      <div className="hero-score"><small>Hottest lead</small><strong>{hottest}</strong><span>/100 intent</span></div>
     </section>
     <section className="stats-grid">{stats.map(([label, value, delta, note]) => <article className="stat-card" key={label}><div className="stat-head"><span>{label}</span><em>{delta}</em></div><strong>{value}</strong><p>{note}</p></article>)}</section>
     <section className="content-grid">
       <div className="panel">
-        <div className="panel-head"><div><p className="eyebrow">Priority queue</p><h3>Best opportunities right now</h3></div><span className="muted">Intent ≥ 79</span></div>
-        <div className="lead-list">{leads.slice(0,4).map((lead) => <LeadRow key={lead.id} lead={lead} onClick={() => onLeadClick(lead)} />)}</div>
+        <div className="panel-head"><div><p className="eyebrow">Priority queue</p><h3>Best opportunities right now</h3></div><span className="muted">Highest intent first</span></div>
+        <div className="lead-list">{[...leads].sort((a, b) => b.score - a.score).slice(0,4).map((lead) => <LeadRow key={lead.id} lead={lead} onClick={() => onLeadClick(lead)} />)}</div>
       </div>
       <div className="panel signal-panel">
         <div className="panel-head"><div><p className="eyebrow">Signal quality</p><h3>Why this works</h3></div></div>
@@ -108,7 +142,7 @@ function LeadFeed({ leads, selected, setSelected, query, setQuery }: { leads: Le
       <h2>{selected.service}</h2>
       <blockquote>“{selected.text}”</blockquote>
       <div className="reason-grid">{selected.reasons.map((reason) => <span key={reason}>✓ {reason}</span>)}</div>
-      <div className="detail-section"><div className="section-title"><h3>Recommended response</h3><span>Business reply</span></div><div className="draft">Hi — we specialize in {selected.service.toLowerCase()} in {selected.neighborhood}. Happy to take a look and explain the right cleaning, joint-sand and sealing approach for the surface. If you'd like, send over a photo or approximate square footage and we can point you in the right direction.</div><button className="secondary-button">Copy response</button></div>
+      <div className="detail-section"><div className="section-title"><h3>Recommended response</h3><span>Business reply</span></div><div className="draft">Hi — we specialize in {selected.service.toLowerCase()} in {selected.neighborhood}. Happy to take a look and explain the right cleaning, joint-sand and sealing approach for the surface. If you&apos;d like, send over a photo or approximate square footage and we can point you in the right direction.</div><button className="secondary-button">Copy response</button></div>
       <div className="detail-section"><div className="section-title"><h3>Past-customer match</h3><span>{matches.length} eligible</span></div>{matches.length ? matches.map((customer) => <div className="customer-match" key={customer.id}><div className="avatar">{customer.name.split(" ").slice(-1)[0][0]}</div><div><strong>{customer.name}</strong><p>{customer.neighborhood} · {customer.service}</p></div><button className="ghost-button small">Prepare outreach</button></div>) : <p className="muted">No recommendable past customer matched this neighborhood yet.</p>}<p className="compliance-note">Only ask a real past customer to share their genuine experience. Do not script or require a positive endorsement.</p></div>
     </div>
   </section>;
@@ -126,8 +160,11 @@ function Keywords() {
   return <section className="panel"><div className="panel-head"><div><p className="eyebrow">Intent dictionary</p><h3>Services + buying phrases</h3></div><button className="primary-button">Add keyword</button></div><div className="keyword-cloud">{keywords.map((keyword, index) => <div className="keyword-card" key={keyword}><span>{index < 6 ? "Service" : "Intent"}</span><strong>{keyword}</strong><em>{index < 6 ? "High weight" : "Intent multiplier"}</em></div>)}</div></section>;
 }
 
-function Integrations() {
+function Integrations({ persistence }: { persistence: PersistenceMode }) {
+  const persistenceState = persistence === "supabase" ? "Connected" : persistence === "loading" ? "Checking" : "Needs secret key";
+  const persistenceTone = persistence === "supabase" ? "good" : "warn";
   const integrations = [
+    ["Supabase", persistenceState, "Production lead, customer, territory and audit storage.", persistenceTone],
     ["Webhook / API", "Active", "POST conversations directly into the scoring pipeline.", "good"],
     ["Manual capture", "Active", "Paste a neighborhood post into the system for immediate scoring.", "good"],
     ["Nextdoor", "API access required", "Connector boundary is ready; use approved API access when available.", "warn"],
