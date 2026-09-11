@@ -1,41 +1,43 @@
-import { NextResponse } from "next/server";
-import { classifyLead } from "@/lib/classify";
-import { addLead } from "@/lib/store";
-import { isPersistenceConfigured } from "@/lib/supabase-rest";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  if (!process.env.INGEST_API_KEY) {
+export async function GET(request: NextRequest) {
+  const ingestKey = process.env.INGEST_API_KEY;
+  if (!ingestKey) {
     return NextResponse.json({ ok: false, ingestKeyConfigured: false }, { status: 503 });
   }
 
-  if (!isPersistenceConfigured()) {
-    return NextResponse.json({ ok: false, ingestKeyConfigured: true, persistenceConfigured: false }, { status: 503 });
-  }
-
-  const classified = classifyLead({
-    source: "manual",
-    externalId: "smoke-2026-09-11-prod",
-    text: "Production smoke test: homeowner in Nocatee is looking for someone to clean, re-sand and seal driveway pavers.",
-    neighborhood: "Nocatee",
-    city: "Ponte Vedra",
-    publishedAt: new Date().toISOString(),
+  const response = await fetch(new URL("/api/ingest", request.nextUrl.origin), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ingestKey}`,
+    },
+    body: JSON.stringify({
+      source: "manual",
+      externalId: "smoke-auth-2026-09-11-prod",
+      text: "Authenticated production smoke test: homeowner in Nocatee needs driveway paver cleaning, re-sanding and sealing.",
+      neighborhood: "Nocatee",
+      city: "Ponte Vedra",
+      publishedAt: new Date().toISOString(),
+    }),
+    cache: "no-store",
   });
 
-  const lead = await addLead(classified);
+  let result: unknown;
+  const text = await response.text();
+  try {
+    result = JSON.parse(text);
+  } catch {
+    result = { body: text.slice(0, 500) };
+  }
 
   return NextResponse.json({
-    ok: true,
+    ok: response.ok,
     ingestKeyConfigured: true,
-    persistenceConfigured: true,
-    lead: {
-      id: lead.id,
-      externalId: lead.externalId,
-      service: lead.service,
-      score: lead.score,
-      recommendationIntent: lead.recommendationIntent,
-    },
-  }, { headers: { "Cache-Control": "no-store" } });
+    ingestStatus: response.status,
+    result,
+  }, { status: response.ok ? 200 : 502, headers: { "Cache-Control": "no-store" } });
 }
