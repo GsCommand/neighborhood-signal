@@ -8,7 +8,7 @@ export function AITeam() {
 
   return (
     <>
-      <section className="hero-card ai-hero">
+      <section className="hero-card">
         <div>
           <span className="status-pill">● AI-native operating model</span>
           <h2>One human owner. A small agent team. Every role tied to an outcome.</h2>
@@ -26,26 +26,25 @@ export function AITeam() {
         <article className="stat-card"><div className="stat-head"><span>Initial infra target</span><em>Profit first</em></div><strong>&lt;$100</strong><p>Use free tiers and small paid services until revenue proves the next expense.</p></article>
       </section>
 
-      <section className="agent-grid">
-        <article className="panel agent-card operator-card">
-          <div className="agent-card-top"><span className="agent-avatar human">G</span><span className="badge good">Human</span></div>
+      <section className="cards-grid">
+        <article className="panel territory-card">
+          <div className="territory-top"><span className="territory-pin">G</span><span className="badge good">Human</span></div>
           <h3>{operator.name}</h3>
-          <strong className="agent-role">{operator.role}</strong>
-          <p>{operator.mission}</p>
-          <div className="agent-meta"><span>Approves spend</span><span>Approves public actions</span><span>Sets product direction</span></div>
+          <p>{operator.role}</p>
+          <div className="chip-row"><span className="chip">Approves spend</span><span className="chip">Approves public actions</span><span className="chip">Sets direction</span></div>
+          <div className="territory-footer"><span>{operator.mission}</span></div>
         </article>
 
         {agents.map((agent) => (
-          <article className="panel agent-card" key={agent.id}>
-            <div className="agent-card-top">
-              <span className="agent-avatar">{agent.name.slice(0, 2).toUpperCase()}</span>
+          <article className="panel territory-card" key={agent.id}>
+            <div className="territory-top">
+              <span className="territory-pin">{agent.name.slice(0, 2).toUpperCase()}</span>
               <span className={`badge ${agent.status === "ready" ? "good" : agent.status === "watching" ? "neutral" : "warn"}`}>{agent.status}</span>
             </div>
             <h3>{agent.name}</h3>
-            <strong className="agent-role">{agent.role}</strong>
-            <p>{agent.mission}</p>
-            <div className="agent-last"><small>Last work</small><span>{agent.lastTask}</span></div>
-            <div className="agent-meta"><span>{agent.cadence}</span><span>{autonomyLabel(agent.autonomy)}</span></div>
+            <p>{agent.role}</p>
+            <div className="chip-row"><span className="chip">{agent.cadence}</span><span className="chip">{autonomyLabel(agent.autonomy)}</span></div>
+            <div className="territory-footer"><span>{agent.lastTask}</span></div>
           </article>
         ))}
       </section>
@@ -62,7 +61,7 @@ export function AgentOps() {
       <section className="stats-grid">
         <article className="stat-card"><div className="stat-head"><span>Open agent tasks</span><em>Queue</em></div><strong>{agentTasks.length}</strong><p>Bounded work items with explicit triggers and next actions.</p></article>
         <article className="stat-card"><div className="stat-head"><span>P0 tasks</span><em>Do first</em></div><strong>{p0}</strong><p>Lead-quality and response-speed work outranks cosmetic expansion.</p></article>
-        <article className="stat-card"><div className="stat-head"><span>Blocked</span><em>Needs owner</em></div><strong>{blocked}</strong><p>Tasks only block when a dependency or human approval is actually required.</p></article>
+        <article className="stat-card"><div className="stat-head"><span>Blocked</span><em>Needs owner</em></div><strong>{blocked}</strong><p>Tasks block only when a dependency or human approval is actually required.</p></article>
         <article className="stat-card"><div className="stat-head"><span>Trust mode</span><em>Enforced</em></div><strong>Human</strong><p>Outbound messages, spend, and third-party actions require operator approval.</p></article>
       </section>
 
@@ -71,16 +70,16 @@ export function AgentOps() {
           <div><p className="eyebrow">Agent operating queue</p><h3>What the company should work on next</h3></div>
           <span className="muted">Profit-first priority order</span>
         </div>
-        <div className="task-table-wrap">
-          <table className="task-table">
+        <div className="table-wrap">
+          <table>
             <thead><tr><th>Priority</th><th>Agent</th><th>Task</th><th>Trigger</th><th>Next action</th><th>State</th></tr></thead>
             <tbody>
               {agentTasks.map((task) => {
                 const agent = agentForTask(task);
                 return (
                   <tr key={task.id}>
-                    <td><span className={`priority ${task.priority.toLowerCase()}`}>{task.priority}</span></td>
-                    <td><strong>{agent?.name || task.agentId}</strong><small>{agent?.role}</small></td>
+                    <td><span className={task.priority === "P0" ? "badge warn" : "badge neutral"}>{task.priority}</span></td>
+                    <td><strong>{agent?.name || task.agentId}</strong><div className="muted">{agent?.role}</div></td>
                     <td>{task.title}</td>
                     <td>{task.trigger}</td>
                     <td>{task.nextAction}</td>
@@ -93,23 +92,23 @@ export function AgentOps() {
         </div>
       </section>
 
-      <section className="content-grid ai-rules-grid">
+      <section className="content-grid" style={{ marginTop: 14 }}>
         <div className="panel">
           <div className="panel-head"><div><p className="eyebrow">Autonomy policy</p><h3>What agents can do alone</h3></div></div>
-          <div className="rule-list">
-            <div><strong>Observe</strong><p>Read product data, health status, lead metrics, and approved public information.</p></div>
-            <div><strong>Analyze</strong><p>Classify, score, compare, summarize, prioritize, and identify anomalies.</p></div>
-            <div><strong>Draft</strong><p>Prepare code, content, replies, offers, and reports for review.</p></div>
-            <div><strong>Execute internally</strong><p>Run bounded tests, update internal queues, and perform reversible product work.</p></div>
+          <div className="signal-bars">
+            <div className="guardrail"><strong>Observe</strong><p>Read product data, health status, lead metrics, and approved public information.</p></div>
+            <div className="guardrail"><strong>Analyze</strong><p>Classify, score, compare, summarize, prioritize, and identify anomalies.</p></div>
+            <div className="guardrail"><strong>Draft</strong><p>Prepare code, content, replies, offers, and reports for review.</p></div>
+            <div className="guardrail"><strong>Execute internally</strong><p>Run bounded tests, update internal queues, and perform reversible product work.</p></div>
           </div>
         </div>
         <div className="panel">
           <div className="panel-head"><div><p className="eyebrow">Hard approval gates</p><h3>What stays human-controlled</h3></div></div>
-          <div className="rule-list guardrail-rules">
-            <div><strong>Money</strong><p>Purchases, subscriptions, pricing exceptions, and ad budgets.</p></div>
-            <div><strong>External identity</strong><p>No fake accounts, fake recommendations, or neighbor impersonation.</p></div>
-            <div><strong>Publishing</strong><p>Third-party posts, DMs, campaigns, and customer-facing commitments.</p></div>
-            <div><strong>Risk</strong><p>Production data mutation, lowered security controls, and irreversible actions.</p></div>
+          <div className="signal-bars">
+            <div className="guardrail"><strong>Money</strong><p>Purchases, subscriptions, pricing exceptions, and ad budgets.</p></div>
+            <div className="guardrail"><strong>External identity</strong><p>No fake accounts, fake recommendations, or neighbor impersonation.</p></div>
+            <div className="guardrail"><strong>Publishing</strong><p>Third-party posts, DMs, campaigns, and customer-facing commitments.</p></div>
+            <div className="guardrail"><strong>Risk</strong><p>Production data mutation, lowered security controls, and irreversible actions.</p></div>
           </div>
         </div>
       </section>
