@@ -8,17 +8,16 @@ export const metadata = {
 
 export default function CompanyOSPage() {
   return (
-    <main className="company-os-page">
-      <header className="company-os-header">
+    <main className="main">
+      <header className="topbar">
         <div>
           <p className="eyebrow">Neighborhood Signal · Company OS</p>
           <h1>Profit-first AI operations</h1>
-          <p className="company-os-subtitle">A small, bounded agent team operating one product with one human owner and explicit approval gates.</p>
         </div>
-        <Link className="ghost-button" href="/">← Lead intelligence</Link>
+        <div className="top-actions"><Link className="ghost-button" href="/">← Lead intelligence</Link></div>
       </header>
       <AITeam />
-      <div className="company-os-divider" />
+      <div style={{ height: 24 }} />
       <AgentOps />
     </main>
   );
